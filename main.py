@@ -1,25 +1,28 @@
 import boto3
+import datetime
 import schedule
-import time
 
-ec2_client = boto3.client('ec2', region_name='eu-central-1')
-ec2_resource = boto3.resource('ec2', region_name='eu-central-1')
-
-
-def check_instance_status():
-    reservations = ec2_client.describe_instances()
-    for reservation in reservations["Reservations"]:
-        instances = reservation['Instances']
-        for instance in instances:
-            print(instance['InstanceId'], instance['State'])
-
-    statuses = ec2_client.describe_instance_status()
-    for status in statuses["InstanceStatuses"]:
-        print(status['InstanceId'], status['InstanceStatus'], status['SystemStatus'])
+ec2_client = boto3.client('ec2', region_name='eu-west-1')
+volumes = ec2_client.describe_volumes(
+    Filters=[
+        {
+            'Name': 'tag:Name',
+            'Values': ['prod']
+        }
+    ]
+)
 
 
-schedule.every(10).seconds.do(check_instance_status)
+def create_volume_snapshot():
+    for attachments in volumes['Volumes']:
+        for attachment in attachments['Attachments']:
+            print(attachment)
+            snapshot = ec2_client.create_snapshot(VolumeId=attachment['VolumeId'],
+                                                  Description=f'Created at {datetime.datetime.now():%Y-%m-%d}')
+            print(snapshot)
+
+
+schedule.every(1).day.do(create_volume_snapshot)
 
 while True:
     schedule.run_pending()
-    time.sleep(1)
